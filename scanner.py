@@ -4,6 +4,7 @@ import os
 from PIL import Image, UnidentifiedImageError
 import numpy as np
 import ffmpeg
+import json
 import py_midicsv as pm
 import matplotlib.pyplot as plt
 
@@ -23,8 +24,9 @@ def convert_to_frame(video):
         subprocess.run(["ffmpeg","-i", video, "-an", "-f", "image2", "-vf", "scale=640:-1","./" + video[:video.find(".")] + "/img%05d.png"])
     probe = ffmpeg.probe(video)
     video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
-    # # print(video_info)
-    fps = int(video_info['r_frame_rate'].split('/')[0])
+    print(video_info)
+    fps = int(video_info['r_frame_rate'].split('/')[0])/int(video_info['r_frame_rate'].split('/')[1])
+    print(fps)
     # x_pixels = video_info['width']
     # y_pixels = video_info['height']
     # print(fps, x_pixels, y_pixels)
@@ -32,244 +34,187 @@ def convert_to_frame(video):
     x_pixels = 640
     y_pixels = 320
 
-def analyze(video, half_note_pixel_length=8, whole_note_pixel_length=12):
+def analyze(video, analyzed=False):
     # burn: half - 8, whole - 12
+    # sigma: half - 8, whole - 12
     # nocturne: half - 9, whole - 14
-    # half_note_pixel_length = 9
-    # whole_note_pixel_length = 14
+    half_note_pixel_length = 7
+    whole_note_pixel_length = 12
     files = os.listdir("./"+video[:video.find(".")])
-    # analyze_amount = round(array.shape[0] * 1/24)
-    all_average_pixels = []
-    average_pixels_array = []
-    whole_notes = []
-    first_note = None
-    # Extra notes from each frame
-    array = np.asarray(Image.open("./"+video[:video.find(".")]+"/img00001.png"))
-    background_colors = array[0] 
+    if not analyzed:
+        # analyze_amount = round(array.shape[0] * 1/24)
+        all_average_pixels = []
+        average_pixels_array = []
+        whole_notes = []
+        first_note = None
+        # Extra notes from each frame
+        # WHAT THE BACKGROUND IS SHOULD BE CHANGEABLE
+        array = np.asarray(Image.open("./"+video[:video.find(".")]+"/img00002.png"))
+        background_colors = array[0] 
 
-    for file in files:
-    # for file in files[6500:]:
-        if file.startswith("img") and file.endswith(".png"):
-            print(file)
-            try:
-                array = np.asarray(Image.open("./"+video[:video.find(".")]+"/"+file))
-            except UnidentifiedImageError:
-                print(sorted(list(average_pixels)))
-                all_average_pixels.extend(list(average_pixels))
-                continue
-            # if "00001" in file:
-            #     background_colors = array[0] 
-            # first.save("test.png")
-            # current = []
-            # for x, pixel in enumerate(array[0]):
-            #     if sum(pixel) > 10:
-            #         current.append(1)
-            #     else:
-            #         current.append(0)
-            # status = "neither"
-            # for x, pixel in enumerate(array[0]):
-            #     if current[x] == 1 and previous[x] == 1:
-            #         if status == "neither":
-            #             status = "both exist"
-            #             begin_pixel = x
-            #         elif status == "current exists":
-            #             average_pixel = (x + begin_pixel)/2
-            #             # print(x-begin_pixel, average_pixel)
-            #             if x-begin_pixel > 8:
-            #                 average_pixels.add(round(average_pixel))
-            #             status = "both exist"
-            #             begin_pixel = x
-            #     elif current[x] == 1 and previous[x] == 0:
-            #         if status == "neither":
-            #             status = "both exist"
-            #             begin_pixel = x
-            #         elif status == "both_exist":
-            #             average_pixel = (x + begin_pixel)/2
-            #             # print(x-begin_pixel, average_pixel)
-            #             if x-begin_pixel > 8:
-            #                 average_pixels.add(round(average_pixel))
-            #             status = "current exists"
-            #             begin_pixel = x
-            #     elif current[x] == 0:
-            #         if status == "both exist" or status == "current exists":
-            #             average_pixel = (x + begin_pixel)/2
-            #             # print(x-begin_pixel, average_pixel)
-            #             if x-begin_pixel > 8:
-            #                 average_pixels.add(round(average_pixel))
-                # if current[x] == 1 and previous[x] == 1:
-                #     if status == "neither"
-                # if current[x] == 1 and previous[x] == 0:
-
-
-            note_found = False
-            average_pixels = set()
-            brightness = 0
-            pixel_brightnesses = []
-            for x, pixel in enumerate(array[0]):
-                # distance = sum(pixel)
-                distance = sum(pixel)-sum(background_colors[x])
-                # distance = pixel[0]-background_colors[x][0]+pixel[1]-background_colors[x][1]+pixel[2]-background_colors[x][2]
-                # if file == "img00120.png":
-                #     print(distance, sum(pixel), x)
-                if note_found == False:
-                    if distance > 75:
-                        note_found = True
-                        begin_pixel = x
-                        brightness += sum(pixel)
-                        pixel_brightnesses.append([distance, x])
-                else:
-                    if distance <= 75:
-                        note_found = False
-                        # print(x-begin_pixel, average_pixel)
-                        average_brightness = brightness/(x-begin_pixel)
-                        # print(x-begin_pixel, x, begin_pixel)
-                        if x-begin_pixel >= half_note_pixel_length and average_brightness > 75:
-                            print(x-begin_pixel, average_brightness, "accepted")
-                            note_num = max(round((x-begin_pixel)/whole_note_pixel_length), 1)
-                            average_pixel = ((x-whole_note_pixel_length*(note_num-1) + begin_pixel)/2)
-                            for i in range(note_num):
-                                average_pixels.add(round(average_pixel+whole_note_pixel_length*i))
-                                # if round(average_pixel+whole_note_pixel_length*i) == 188:
-                                    # raise Exception(file, "188 found")
-                            if note_num == 1 and x-begin_pixel > whole_note_pixel_length:
-                                whole_notes.append(round(average_pixel))
-                        else:
-                            print(x-begin_pixel, average_brightness, "rejected!")
-                        brightness = 0
+        for file in files:
+        # for file in files[:440]:
+            if file.startswith("img") and file.endswith(".png"):
+                print(file)
+                try:
+                    array = np.asarray(Image.open("./"+video[:video.find(".")]+"/"+file))
+                except UnidentifiedImageError:
+                    print(sorted(list(average_pixels)))
+                    all_average_pixels.extend(list(average_pixels))
+                    continue
+                note_found = False
+                average_pixels = set()
+                total_distances = 0
+                pixel_total_distances = []
+                # WHAT ROW OF PIXELS IT IS SHOULD BE CHANGEABLE
+                for x, pixel in enumerate(array[0]):
+                    # distance = sum(pixel)
+                    distance = abs(sum(pixel)-sum(background_colors[x]))
+                    # distance = pixel[0]-background_colors[x][0]+pixel[1]-background_colors[x][1]+pixel[2]-background_colors[x][2]
+                    if note_found == False:
+                        if distance > 75:
+                            note_found = True
+                            begin_pixel = x
+                            total_distances += distance
+                            pixel_total_distances.append([distance, x])
                     else:
-                        brightness += distance
-            print(sorted(list(average_pixels)))
-            if not first_note:
-                if len(average_pixels) > 0:
-                    first_note = sorted(list(average_pixels))[0]
-            all_average_pixels.extend(list(average_pixels))
-            average_pixels_array.append(list(average_pixels))
-            # previous = current
-    
-    sorted_all_average_pixels = sorted(list(set(all_average_pixels)))
-    pixel_to_aggregate_mapping = {}
-    print(sorted_all_average_pixels)
-    sep = True
-    aggregate_list = []
-    # Map similar values to a single value
-    for i in range(len(sorted_all_average_pixels)-1):
-        diff = sorted_all_average_pixels[i+1]-sorted_all_average_pixels[i]
-        if diff < 4*(whole_note_pixel_length/14):
-            sep = False
-            if len(aggregate_list) > 0:
-                # if sorted_all_average_pixels[i]-aggregate_list[0] < half_note_pixel_length: 
-                print(sorted_all_average_pixels[i]-aggregate_list[0], aggregate_list[0], sorted_all_average_pixels[i], (half_note_pixel_length/2.0))
-                if (sorted_all_average_pixels[i]-aggregate_list[0]) < (half_note_pixel_length/2.0): 
-                    aggregate_list.append(sorted_all_average_pixels[i])
+                        # if distance <= 75 or x-begin_pixel >= whole_note_pixel_length:
+                        #     note_found = False
+                        #     average_brightness = total_distances/(x-begin_pixel)
+                        #     if average_brightness > 75:
+                        #         # print(total_distances, pixel_total_distances)
+                        #         average_pixel = sum(ele[0]*ele[1] for ele in pixel_total_distances)/(total_distances)
+                        #         average_pixels.add(round(average_pixel))
+                        #         begin_pixel = x
+                        #     pixel_total_distances = []
+                        #     total_distances = 0
+                        if distance <= 75:
+                            note_found = False
+                            # print(x-begin_pixel, average_pixel)
+                            average_brightness = total_distances/(x-begin_pixel)
+                            # print(x-begin_pixel, x, begin_pixel)
+                            if x-begin_pixel >= half_note_pixel_length and average_brightness > 75:
+                                # print(x-begin_pixel, average_brightness, "accepted")
+                                note_num = max(round((x-begin_pixel)/whole_note_pixel_length), 1)
+                                average_pixel = ((x-whole_note_pixel_length*(note_num-1) + begin_pixel)/2)
+                                for i in range(note_num):
+                                    average_pixels.add(round(average_pixel+whole_note_pixel_length*i))
+                                    if (round(average_pixel+whole_note_pixel_length*i) == 362):
+                                        print("YO THIS IS ONE OF THEM")
+                                if note_num == 1 and x-begin_pixel > whole_note_pixel_length:
+                                    whole_notes.append(round(average_pixel))
+                            # else:
+                                # print(x-begin_pixel, average_brightness, "rejected!")
+                            total_distances = 0
+                        else:
+                            pixel_total_distances.append([distance, x])
+                            total_distances += distance
+                print(sorted(list(average_pixels)))
+                if not first_note:
+                    if len(average_pixels) > 0:
+                        first_note = sorted(list(average_pixels))[0]
+                all_average_pixels.extend(list(average_pixels))
+                average_pixels_array.append(list(average_pixels))
+                # previous = current
+        
+        sorted_all_average_pixels = sorted(list(set(all_average_pixels)))
+        pixel_to_aggregate_mapping = {}
+        print(sorted_all_average_pixels)
+        sep = True
+        aggregate_list = []
+        # Map similar values to a single value
+        for i in range(len(sorted_all_average_pixels)-1):
+            current = sorted_all_average_pixels[i]
+            diff = sorted_all_average_pixels[i+1]-current
+            if diff < 4*(whole_note_pixel_length/14):
+                # sep holds whether the space before current is a seperation between aggregate values
+                sep = False
+                if len(aggregate_list) > 0:
+                    # if current-aggregate_list[0] < half_note_pixel_length: 
+                    print(current-aggregate_list[0], aggregate_list[0], current, (half_note_pixel_length/2.0))
+                    if (current-aggregate_list[0]) < (half_note_pixel_length/2.0): 
+                        aggregate_list.append(current)
+                    else:
+                        average = round(sum(aggregate_list)/len(aggregate_list))
+                        for num in aggregate_list:
+                            pixel_to_aggregate_mapping[num] = average
+                        sep = True
+                        aggregate_list = []
+                        # aggregate_list.append(current)
+                        pixel_to_aggregate_mapping[current] = current
                 else:
-                    aggregate_list.append(sorted_all_average_pixels[i])
+                    aggregate_list.append(current)
+            else:
+                if sep == False:
+                    aggregate_list.append(current)
                     average = round(sum(aggregate_list)/len(aggregate_list))
                     for num in aggregate_list:
                         pixel_to_aggregate_mapping[num] = average
                     sep = True
-                    aggregate_list = []
-            else:
-                aggregate_list.append(sorted_all_average_pixels[i])
+                else:
+                    pixel_to_aggregate_mapping[current] = current
+                aggregate_list = []
+        # Add ending x values to map
+        if sep == True:
+            pixel_to_aggregate_mapping[sorted_all_average_pixels[-1]] = sorted_all_average_pixels[-1]
         else:
-            if sep == False:
-                aggregate_list.append(sorted_all_average_pixels[i])
-                average = round(sum(aggregate_list)/len(aggregate_list))
-                for num in aggregate_list:
-                    pixel_to_aggregate_mapping[num] = average
-                sep = True
-            else:
-                pixel_to_aggregate_mapping[sorted_all_average_pixels[i]] = sorted_all_average_pixels[i]
-            aggregate_list = []
-    # Add ending x values to map
-    if sep == True:
-        pixel_to_aggregate_mapping[sorted_all_average_pixels[-1]] = sorted_all_average_pixels[-1]
+            aggregate_list.append(sorted_all_average_pixels[-1])
+            average = round(sum(aggregate_list)/len(aggregate_list))
+            for num in aggregate_list:
+                pixel_to_aggregate_mapping[num] = average
+
+        print(pixel_to_aggregate_mapping)
+        # Substitute old values for modified ones
+        modified_all_average_pixels = []
+        for i in range(len(average_pixels_array)):
+            for j in range(len(average_pixels_array[i])):
+                average_pixels_array[i][j] = pixel_to_aggregate_mapping[average_pixels_array[i][j]]
+            modified_all_average_pixels.extend(average_pixels_array[i])
+        sorted_modified_all_average_pixels = sorted(list(set(modified_all_average_pixels)))
+        print(sorted_modified_all_average_pixels, "sorted_modified_all_average_pixels")
+
+        # Modify the first note as well
+        modified_first_note = pixel_to_aggregate_mapping[first_note]
+        print("first note: ", modified_first_note)
+        recieved = input("The midi representation of the first note is: ")
+        if "\x1b[A" in recieved:
+            recieved = recieved[6:]
+        first_note_midi_value = int(recieved)
+
+        # Graph the song's transcribed notes
+        plt.figure(figsize=(5,40))
+        x_coords = []
+        y_coords = []
+        for i, frame in enumerate(average_pixels_array):
+            for note in frame:
+                x_coords.append(i)
+                y_coords.append(note)
+        plt.scatter(y_coords,x_coords,s=1)
+        plt.savefig("song transcription.png")
+
+
+        with open(video[:video.find(".")]+".txt", "w") as f:
+            f.write(str(modified_first_note) + "\n" + str(first_note_midi_value))
+        with open(video[:video.find(".")]+"_array.txt", "a") as f:
+            for time in average_pixels_array:
+                f.write(str(time)+"\n")
+        with open(video[:video.find(".")]+".json", "w") as f:
+            json.dump(sorted_modified_all_average_pixels,f)
     else:
-        aggregate_list.append(sorted_all_average_pixels[-1])
-        average = round(sum(aggregate_list)/len(aggregate_list))
-        for num in aggregate_list:
-            pixel_to_aggregate_mapping[num] = average
-
-    print(pixel_to_aggregate_mapping)
-    # Substitute old values for modified ones
-    modified_all_average_pixels = []
-    for i in range(len(average_pixels_array)):
-        for j in range(len(average_pixels_array[i])):
-            average_pixels_array[i][j] = pixel_to_aggregate_mapping[average_pixels_array[i][j]]
-        modified_all_average_pixels.extend(average_pixels_array[i])
-    sorted_modified_all_average_pixels = sorted(list(set(modified_all_average_pixels)))
-    print(sorted_modified_all_average_pixels, "sorted_modified_all_average_pixels")
-
-    # # Substitute values in the whole notes as well
-    # modified_whole_notes = []
-    # for whole_note in whole_notes:
-    #     modified_whole_notes.append(pixel_to_aggregate_mapping[whole_note])
-    # modified_whole_notes = list(sorted(set(modified_whole_notes)))
-    # print(list(sorted(set(modified_whole_notes))), "modified_whole_notes")
-    # modified_whole_notes_differences = []
-    # for i in range(len(modified_whole_notes)-1):
-    #     modified_whole_notes_differences.append(modified_whole_notes[i+1]-modified_whole_notes[i])
-    # print(modified_whole_notes_differences, "modified_whole_notes_differences") 
-
-    # Modify the first note as well
-    modified_first_note = pixel_to_aggregate_mapping[first_note]
-    print("first note: ", modified_first_note)
-    first_note_midi_value = int(input("The midi representation of the first note is: "))
-
-    # Graph the song's transcribed notes
-    plt.figure(figsize=(5,40))
-    x_coords = []
-    y_coords = []
-    for i, frame in enumerate(average_pixels_array):
-        for note in frame:
-            x_coords.append(i)
-            y_coords.append(note)
-    plt.scatter(y_coords,x_coords,s=1)
-    plt.savefig("song transcription.png")
-
+        with open(video[:video.find(".")]+".txt", "r") as f:
+            modified_first_note, first_note_midi_value = [int(x) for x in f.read().split("\n")]
+        with open(video[:video.find(".")]+"_array.txt", "r") as f:
+            # average_pixels_array = []
+            average_pixels_array = []
+            for line in f.read().split("\n"):
+                try:
+                    average_pixels_array.append(eval(line))
+                except:
+                    pass
+        with open(video[:video.find(".")]+".json", "r") as f:
+            sorted_modified_all_average_pixels = json.load(f)
     # Find half-step differences between note values
     modified_notes_to_midi = {}
-    # sorted_differences = []
-    # sorted_minimum_halfstep_differences = []
-    # for i in range(len(sorted_modified_all_average_pixels)):
-    #     division = 7.4*(whole_note_pixel_length/14)
-    #     # division = 7.4+difference_to_standard
-    #     # print(division)
-    #     # print(7.4*whole_note_pixel_length/14)
-    #     sorted_differences.append((sorted_modified_all_average_pixels[i]-modified_first_note))
-    #     sorted_minimum_halfstep_differences.append(round((sorted_modified_all_average_pixels[i]-modified_first_note)/(division)))
-        # sorted_minimum_halfstep_differences.append((sorted_modified_all_average_pixels[i]-minimum_value)/7.2)
-    # relative_differences_to_c_to_midi_difference = {
-    #     0 : 0,
-    #     1 : 1,
-    #     2 : 2,
-    #     3 : 3,
-    #     4 : 4,
-    #     5 : 4,
-    #     6 : 5,
-    #     7 : 6,
-    #     8 : 7,
-    #     9 : 8,
-    #     10 : 9,
-    #     11 : 10,
-    #     12 : 11,
-    #     13 : 11,
-    # }
-    note_size = 12
-    # x_value_diffs_to_c_to_midi_diffs = {
-    #     0 : 0,
-    #     8 : 1,
-    #     12 : 2,
-    #     16 : 3,
-    #     24 : 4,
-    #     36 : 5,
-    #     42 : 6,
-    #     48 : 7,
-    #     54 : 8,
-    #     60 : 9,
-    #     78 : 10,
-    #     72 : 11,
-    #     84 : 12,
-    # }
     x_value_diffs_to_c_to_midi_diffs = {
         0 : 0,
         8 : 1,
@@ -283,23 +228,11 @@ def analyze(video, half_note_pixel_length=8, whole_note_pixel_length=12):
         65 : 9,
         73 : 10,
         77 : 11,
-        88 : 12,
+        # 86 : 12,
+        87 : 12,
+        # 88 : 12,
     }
-    # x_value_diffs_to_c_to_midi_diffs = {
-    #     0 : 0,
-    #     8 : 1,
-    #     14 : 2,
-    #     18 : 3,
-    #     28 : 4,
-    #     42 : 5,
-    #     46 : 6,
-    #     56 : 7,
-    #     63 : 8,
-    #     70 : 9,
-    #     78 : 10,
-    #     84 : 11,
-    #     98 : 12,
-    # }
+
     # print(sorted_differences, "sorted_differences")
     # print(sorted_minimum_halfstep_differences, "sorted_minimum_half_step_differences")
     # # Set the median equal to middle C (can be transposed)
@@ -319,13 +252,14 @@ def analyze(video, half_note_pixel_length=8, whole_note_pixel_length=12):
     first_note_x_value_diff_from_c = res = dict((v,k) for k,v in x_value_diffs_to_c_to_midi_diffs.items())[first_note_distance_from_c]
     # first_note_x_value_diff_from_c = list(x_value_diffs_to_c_to_midi_diffs.keys())[list(x_value_diffs_to_c_to_midi_diffs.values()).find(first_note_distance_from_c)]
     for x_value, midi_diff in x_value_diffs_to_c_to_midi_diffs.items():
-        x_value_diffs_to_midi_diffs[(x_value - first_note_x_value_diff_from_c) % 88] = (midi_diff - first_note_distance_from_c) % 12
+        x_value_diffs_to_midi_diffs[(x_value - first_note_x_value_diff_from_c) % 86] = (midi_diff - first_note_distance_from_c) % 12
+    x_value_diffs_to_midi_diffs[86] = 12
     print(x_value_diffs_to_midi_diffs)
     print(sorted(x_value_diffs_to_midi_diffs.keys()))
 
     for i in range(len(minimum_differences)):
         x_value = minimum_differences[i]
-        x_value_diff = x_value % 88
+        x_value_diff = x_value % 86
         still_below = True
         for j, key in enumerate(sorted(x_value_diffs_to_midi_diffs.keys())):
             if key >= x_value_diff:
@@ -342,8 +276,8 @@ def analyze(video, half_note_pixel_length=8, whole_note_pixel_length=12):
 
                         modified_x_value_diff = key
                 break
-        midi_note = (x_value // 88) * 12 + x_value_diffs_to_midi_diffs[modified_x_value_diff]
-        print(sorted_modified_all_average_pixels[i], (x_value // 88) * 12, x_value_diffs_to_midi_diffs[modified_x_value_diff], modified_x_value_diff, x_value_diff)
+        midi_note = (x_value // 86) * 12 + x_value_diffs_to_midi_diffs[modified_x_value_diff]
+        print(sorted_modified_all_average_pixels[i], (x_value // 86) * 12, x_value_diffs_to_midi_diffs[modified_x_value_diff], modified_x_value_diff, x_value_diff)
         modified_notes_to_midi[sorted_modified_all_average_pixels[i]] = midi_note + first_note_midi_value
         
     print(modified_notes_to_midi, "modified_notes_to_midi")
@@ -398,7 +332,10 @@ def analyze(video, half_note_pixel_length=8, whole_note_pixel_length=12):
     # Should be bright acoustic piano??? this 1 needs to be checked
     midi_array.append("2,0,Program_c,0,1\n")
     for note_press in note_presses:
-        modified_time = (round(time_multiplier*note_press[1]) // 24)*24
+        # modified_time = (round(time_multiplier*note_press[1]) // 192)*192   
+        modified_time = (round(time_multiplier*note_press[1]) // 48)*48   
+        # modified_time = (round(time_multiplier*note_press[1]) // 24)*24   
+        # modified_time = (round(time_multiplier*note_press[1]))
         # print(round(time_multiplier*note_press[1]), modified_time, "IF A TIME WAS CHANGED:")
         if note_press[2] == "on":
             midi_array.append("2," + str(modified_time) + ",Note_on_c,0,"+str(note_press[0])+",110\n")
@@ -435,4 +372,8 @@ def analyze(video, half_note_pixel_length=8, whole_note_pixel_length=12):
 if __name__ == "__main__":
     video = sys.argv[1]
     convert_to_frame(video)
-    analyze(video)
+    if len(sys.argv) > 2:
+        analyzed = sys.argv[2]
+        analyze(video, analyzed=analyzed)
+    else:
+        analyze(video)
